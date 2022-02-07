@@ -16,7 +16,7 @@ It then creates a simple two party call application that answers calls to the pr
 
 ![Overview](/images/VoiceFocusDemo.png)
 
-This app is a bare-bones example, but it illustrates how to build Chime SDK applications using a number of PSTN Audio actions: [VoiceFocus](https://docs.aws.amazon.com/chime/latest/dg/vociefocus.html), [CallAndBridge](https://docs.aws.amazon.com/chime/latest/dg/call-and-bridge.html), [PlayAudioAndGetDigits](https://docs.aws.amazon.com/chime/latest/dg/play-audio-get-digits.html), [PlayAudio](https://docs.aws.amazon.com/chime/latest/dg/play-audio.html), [ReceiveDigits](https://docs.aws.amazon.com/chime/latest/dg/listen-to-digits.html) and [Hangup]().
+This app is a bare-bones example, but it illustrates how to build Chime SDK applications using a number of PSTN Audio actions: [VoiceFocus](https://docs.aws.amazon.com/chime/latest/dg/voicefocus.html), [CallAndBridge](https://docs.aws.amazon.com/chime/latest/dg/call-and-bridge.html), [PlayAudioAndGetDigits](https://docs.aws.amazon.com/chime/latest/dg/play-audio-get-digits.html), [PlayAudio](https://docs.aws.amazon.com/chime/latest/dg/play-audio.html), [ReceiveDigits](https://docs.aws.amazon.com/chime/latest/dg/listen-to-digits.html) and [Hangup]().
 ## Installing Dependencies
 
 On a clean linux instance, you need to install the [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html), [jq](https://stedolan.github.io/jq/download/) and the [Node Version Manager (nvm)](https://github.com/nvm-sh/nvm).  You can then use nvm to install the other dependendencies, like this:
