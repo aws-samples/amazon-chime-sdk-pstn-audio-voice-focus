@@ -1,0 +1,1 @@
+rm -Rf *~ lib/*.js lib/*.d.ts test/*.js test/*.d.ts node_modules package-lock.json *.lock 

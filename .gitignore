@@ -2,12 +2,11 @@
 *.d.ts
 node_modules
 out
-oldlogs
 package-lock.json
+*.lock
 lib/*.js
 bin/*.js
 test/*.js
-src/layer/nodejs/package-lock.json
 
 # CDK asset staging directory
 .cdk.staging
