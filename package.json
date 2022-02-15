@@ -8,8 +8,9 @@
     "build": "tsc",
     "watch": "tsc -w",
     "test": "jest",
-    "deploy": "cdk deploy --outputs-file ./cdk-outputs.json --no-rollback --require-approval never --verbose",
-    "destroy": "cdk destroy --force"
+    "clean": "scripts/clean",
+    "deploy": "yarn build && cdk deploy --outputs-file ./cdk-outputs.json --no-rollback --require-approval never --verbose",
+    "destroy": "yarn build && cdk destroy --force"
   },
   "author": "garethn@amazon.com",
   "license": "MIT-0",
