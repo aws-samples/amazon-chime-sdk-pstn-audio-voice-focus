@@ -17,7 +17,7 @@ EOF
 source /home/ec2-user/.bash_profile
 nvm install 16
 nvm use 16
-npm install -g npm nodejs typescript aws-sdk aws-cdk
+npm install -g npm nodejs typescript aws-sdk aws-cdk yarn
 ```
 
 However, always refer to the documentation for all relevant packages for installation instructions.

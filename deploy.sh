@@ -1,2 +1,3 @@
-make deploy
+yarn install
+yarn deploy
 
