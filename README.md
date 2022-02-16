@@ -18,6 +18,12 @@ It then creates a simple two party call application that answers calls to the pr
 
 This app is a bare-bones example, but it illustrates how to build Chime SDK applications using a number of PSTN Audio actions: [VoiceFocus](https://docs.aws.amazon.com/chime/latest/dg/voicefocus.html), [CallAndBridge](https://docs.aws.amazon.com/chime/latest/dg/call-and-bridge.html), [PlayAudioAndGetDigits](https://docs.aws.amazon.com/chime/latest/dg/play-audio-get-digits.html), [PlayAudio](https://docs.aws.amazon.com/chime/latest/dg/play-audio.html), [ReceiveDigits](https://docs.aws.amazon.com/chime/latest/dg/listen-to-digits.html) and [Hangup]().  
 
+
+## Call Sequence Diagram
+
+![Overview](/images/sequence_diagram.png)
+
+
 ## Installing Dependencies
 
 To build and deploy this demo, you need to install the [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html), [jq](https://stedolan.github.io/jq/download/) and the [Node Version Manager (nvm)](https://github.com/nvm-sh/nvm).  You can then use nvm to install the other dependendencies, like this:
@@ -28,7 +34,7 @@ nvm use 16 # selects it
 npm install -g npm nodejs typescript aws-sdk aws-cdk yarn # installs the necessary modules
 ```
 
-We choose to use [yarn ](https://classic.yarnpkg.com/lang/en/) for package management and automation but you can just as easily just stick with [npm](https://www.npmjs.com/)
+We choose to use [yarn](https://classic.yarnpkg.com/lang/en/) for package management and automation but you can just as easily stick with [npm](https://www.npmjs.com/)
 
 An example of the commands to install on Amazon Linux (or other yum-based linux) is [here](SETUP-DEPS.md).  However, please always reference those tools installation instructions if needed.  
 
@@ -78,6 +84,8 @@ arn:aws:cloudformation:us-east-1:<account number>:stack/ChimeSdkPstnVoiceFocusSt
 
 All you need is the phone number on the line ```ChimeSdkPstnVoiceFocusStack.inboundPhoneNumber```.  Call that number and the app will respond by voice.
 
+
+
 ## Customizing For Your Own Use
 
 This CDK script will create a stack named ChimeSdkPstnVoiceFocusStack.  Since the outputs of a stack must be unique across the region that the stack is deployed to you can change the stack name to enable deploying it more than once.  To make it easier for you to do this, copy and paste this snip to the command line and replace NEWNAME with your new application stack name:
@@ -105,7 +113,7 @@ The CDK script is located in the ```lib``` folder.  More information on the CDK 
 The deploy script will handle downloading all necessary node modules for you. If you want to trigger that manually you can:
 
 ```bash
-yarm install
+yarn install
 ```
 ### Depoloying to Your AWS Account
 

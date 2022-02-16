@@ -79,10 +79,11 @@ def response(*actions):
     }
 
 
-# For new incoming calls, play greeting and collect digits of destination number
+# For new incoming calls, play greeting and collect digits of destination number.
+# Regex for digits entered allows US calling, except for premium rate numbers
 def new_call_handler(call_id):
         logger.info('SEND {} {}'.format(log_prefix, 'Sending PlayAndGetDigits action to get Destination Number'))
-        return response(play_and_get_digits_action(call_id, '1(\d{10})$', 'welcome_vf_demo.wav', 'invalid_entry.wav'))
+        return response(pause_action(call_id), play_and_get_digits_action(call_id, '^(?!1900)1[0-9][0-9][0-9](\d{7})$', 'welcome_vf_demo.wav', 'invalid_entry.wav'))
 
 
 # We use this function to connect the caller to the new destination number
@@ -115,10 +116,24 @@ def enable_dtmf_control(event):
 def control_voicefocus(call_id, event):
     if event['ActionData']['ReceivedDigits'] == '0':
         enabled = False
-    else:
+    elif event['ActionData']['ReceivedDigits'] == '1':
         enabled = True
-    logger.info('SEND {} {}'.format(log_prefix, 'Setting VoiceFocus enabled to {} for {}'.format(enabled, call_id)))
-    return response(voicefocus_action(call_id, enabled))
+    # Allow a participant to disable the other participants Voice Focus
+    elif event['ActionData']['ReceivedDigits'] == '8':
+        call_id_0 = event['CallDetails']['Participants'][0]['CallId']
+        if call_id == call_id_0:
+            call_id = event['CallDetails']['Participants'][1]['CallId']
+        else:
+            call_id = call_id_0
+        enabled = False
+    # Allow a participant to enable the other participants Voice Focus
+    elif event['ActionData']['ReceivedDigits'] == '9':
+        call_id_0 = event['CallDetails']['Participants'][0]['CallId']
+        if call_id == call_id_0:
+            call_id = event['CallDetails']['Participants'][1]['CallId']
+        else:
+            call_id = call_id_0
+        enabled = True
 
 
 # When we receive a hangup event, we make sure to tear down any participants still connected
@@ -217,6 +232,17 @@ def play_audio_action(call_id, audio_file):
                     'BucketName': wav_bucket,
                     'Key': audio_file
                 }
+            }
+        }
+
+
+# To read more on customizing the Pause action, see https://docs.aws.amazon.com/chime/latest/dg/pause.html
+def pause_action(call_id):
+    return {
+            'Type': 'Pause',
+            'Parameters': {
+                'CallId': call_id,
+                'DurationInMilliseconds': '3000'
             }
         }
 
