@@ -134,7 +134,8 @@ def control_voicefocus(call_id, event):
         else:
             call_id = call_id_0
         enabled = True
-
+    logger.info('SEND {} {}'.format(log_prefix, 'Setting VoiceFocus enabled to {} for {}'.format(enabled, call_id)))
+    return response(voicefocus_action(call_id, enabled))
 
 # When we receive a hangup event, we make sure to tear down any participants still connected
 def hangup(participants):
