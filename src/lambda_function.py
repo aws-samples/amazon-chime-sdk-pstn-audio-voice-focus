@@ -1,61 +1,82 @@
-import os
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy of this
+# software and associated documentation files (the "Software"), to deal in the Software
+# without restriction, including without limitation the rights to use, copy, modify,
+# merge, publish, distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+# INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+# PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+# HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
+
 import json
 import logging
+import os
 
 
 # Set LogLevel using environment variable, fallback to INFO if not present
 logger = logging.getLogger()
-try:
-    log_level = os.environ['LogLevel']
-    if log_level not in ['INFO', 'DEBUG']:
-        log_level = 'INFO'
-except:
+log_level = os.getenv('LogLevel', 'INFO')
+if log_level not in ['INFO', 'DEBUG']:
     log_level = 'INFO'
 logger.setLevel(log_level)
+global log_prefix 
+log_prefix = " - "
 
 # Load environment variables
-wav_bucket = os.environ['WAVFILE_BUCKET']
+wav_bucket = os.getenv('WAVFILE_BUCKET', None)
+
+
+# handler mapping table -- calls the method 'value' for the event 'key'
+handlers = {
+    'NEW_INBOUND_CALL': lambda call_id, event, participants: new_call_handler(call_id),
+    'RINGING': lambda call_id, event, participants: response(),
+    'ACTION_SUCCESSFUL': lambda call_id, event, participants: action_success_handler(call_id, event),
+    'DIGITS_RECEIVED': lambda call_id, event, participants: control_voicefocus(call_id, event),
+    'HANGUP': lambda call_id, event, participants: hangup(participants),
+    # 'ACTION_FAILED': lambda call_id, event, participants: (
+    #     # logger.error('RECV {} {} {} {}'.format(
+    #     #         log_prefix, event['ActionData']['ErrorType'], event['ActionData']['ErrorMessage'], json.dumps(event)))
+    #     # return play_error_message(call_id))
+    # 'INVALID_LAMBDA_RESPONSE': lambda call_id, event, participants: (
+    #     logger.error('RECV {} : {} : {} : {}'.format(
+    #             log_prefix, event['ErrorType'], event['ErrorMessage'], json.dumps(event)))
+    #     return play_error_message(call_id))
+}
 
 
 # This is the entry point for all incoming events from Chime SipMediaApplications
 def lambda_handler(event, context):
-
-    event_type = event['InvocationEventType']
-    participants = event['CallDetails']['Participants']
-    call_id = participants[0]['CallId']
-    to_number = participants[0]['To']
-    from_number = participants[0]['From']
-
     global log_prefix
-    log_prefix = 'Call-ID:{} {} From:[{}] To:[{}]: '.format(call_id, event_type, from_number, to_number)
-    logger.info('RECV {} {} {}'.format(log_prefix, event_type, 'event received'))
+    resp = response()
 
-    if event_type == 'NEW_INBOUND_CALL':
-        return new_call_handler(call_id)
+    call_id = None
+    try:
+        event_type = event.get('InvocationEventType', "NO-EVENT")
+        participants = event['CallDetails']['Participants']
+        call_id = participants[0]['CallId']
+        to_number = participants[0]['To']
+        from_number = participants[0]['From']
 
-    elif event_type == 'RINGING':
-        return response()
+        log_prefix = 'Call-ID:{} {} From:[{}] To:[{}]: '.format(
+            call_id, event_type, from_number, to_number)
+        logger.info('RECV {} {} {}'.format(
+            log_prefix, event_type, 'event received'))
 
-    elif event_type == 'ACTION_SUCCESSFUL':
-        return action_success_handler(call_id, event)
+        resp = handlers[event_type](call_id, event, participants)
+    except Exception as err:
+        logger.error('RECV {} Unhandled event: {} {}'.format(
+                log_prefix, event_type, json.dumps(event)))
+        if (call_id is not None):
+            resp = play_error_message(call_id)
 
-    elif event_type == 'DIGITS_RECEIVED':
-        return control_voicefocus(call_id, event)
-
-    elif event_type == 'HANGUP':
-        return hangup(participants)
-
-    elif event_type == 'ACTION_FAILED':
-        logger.error('RECV {} {} {} {}'.format(log_prefix, event['ActionData']['ErrorType'], event['ActionData']['ErrorMessage'], json.dumps(event)))
-        return play_error_message(call_id)
-
-    elif event_type == 'INVALID_LAMBDA_RESPONSE':
-        logger.error('RECV {} : {} : {} : {}'.format(log_prefix, event['ErrorType'], event['ErrorMessage'], json.dumps(event)))
-        return play_error_message(call_id)
-
-    else:
-        logger.error('RECV {} Unhandled event: {} {}'.format(log_prefix, event_type, json.dumps(event)))
-        return play_error_message(call_id)
+    return resp
 
 
 # If we receive an ACTION_SUCCESSFUL event we can take further actions,
@@ -82,13 +103,15 @@ def response(*actions):
 # For new incoming calls, play greeting and collect digits of destination number.
 # Regex for digits entered allows US calling, except for premium rate numbers
 def new_call_handler(call_id):
-        logger.info('SEND {} {}'.format(log_prefix, 'Sending PlayAndGetDigits action to get Destination Number'))
-        return response(pause_action(call_id), play_and_get_digits_action(call_id, '^(?!1900)1[0-9][0-9][0-9](\d{7})$', 'welcome_vf_demo.wav', 'invalid_entry.wav'))
+    logger.info('SEND {} {}'.format(
+        log_prefix, 'Sending PlayAndGetDigits action to get Destination Number'))
+    return response(pause_action(call_id), play_and_get_digits_action(call_id, '^(?!1900)1[0-9][0-9][0-9](\d{7})$', 'welcome_vf_demo.wav', 'invalid_entry.wav'))
 
 
 # We use this function to connect the caller to the new destination number
 def bridge(call_id, event):
-    logger.info('SEND {} {} {}'.format(log_prefix, 'Sending CallAndBridge action to Call-ID', call_id))
+    logger.info('SEND {} {} {}'.format(
+        log_prefix, 'Sending CallAndBridge action to Call-ID', call_id))
     destination_number = '+' + event['ActionData']['ReceivedDigits']
     caller_id = event['CallDetails']['Participants'][0]['To']
     return response(call_and_bridge_action(caller_id, destination_number))
@@ -96,7 +119,8 @@ def bridge(call_id, event):
 
 # We turn on VoiceFocus for both calls once the bridge action has been successful
 def enable_voicefocus(event):
-    logger.info('SEND {} {}'.format(log_prefix, 'Sending VoiceFocus command for both participants'))
+    logger.info('SEND {} {}'.format(
+        log_prefix, 'Sending VoiceFocus command for both participants'))
     actions = []
     for call in event['CallDetails']['Participants']:
         actions.append(voicefocus_action(call['CallId'], 'True'))
@@ -105,7 +129,8 @@ def enable_voicefocus(event):
 
 # Once Voice Focus has been enabled, we provide the participants the ability to turn it on/off using DTMF tones
 def enable_dtmf_control(event):
-    logger.info('SEND {} {}'.format(log_prefix, 'Enabling VoiceFocus DTMF toggle support for both participants'))
+    logger.info('SEND {} {}'.format(
+        log_prefix, 'Enabling VoiceFocus DTMF toggle support for both participants'))
     actions = []
     for call in event['CallDetails']['Participants']:
         actions.append(receive_digits_action(call['CallId'],))
@@ -134,10 +159,13 @@ def control_voicefocus(call_id, event):
         else:
             call_id = call_id_0
         enabled = True
-    logger.info('SEND {} {}'.format(log_prefix, 'Setting VoiceFocus enabled to {} for {}'.format(enabled, call_id)))
+    logger.info('SEND {} {}'.format(
+        log_prefix, 'Setting VoiceFocus enabled to {} for {}'.format(enabled, call_id)))
     return response(voicefocus_action(call_id, enabled))
 
 # When we receive a hangup event, we make sure to tear down any participants still connected
+
+
 def hangup(participants):
     for call in participants:
         if call['Status'] == 'Connected':
@@ -156,8 +184,8 @@ def play_error_message(call_id):
 # To read more on customizing the PlayAudioAndGetDigits action, see https://docs.aws.amazon.com/chime/latest/dg/play-audio-get-digits.html
 def play_and_get_digits_action(call_id, regex, audio_file, failure_audio_file):
     return {
-            'Type': 'PlayAudioAndGetDigits',
-            'Parameters': {
+        'Type': 'PlayAudioAndGetDigits',
+        'Parameters': {
                 'CallId': call_id,
                 'InputDigitsRegex': regex,
                 'AudioSource': {
@@ -165,19 +193,19 @@ def play_and_get_digits_action(call_id, regex, audio_file, failure_audio_file):
                     'BucketName': wav_bucket,
                     'Key': audio_file
                 },
-                'FailureAudioSource': {
+            'FailureAudioSource': {
                     'Type': 'S3',
                     'BucketName': wav_bucket,
                     'Key': failure_audio_file
-                },
-                'MinNumberOfDigits': 11,
-                'MaxNumberOfDigits': 11,
-                'TerminatorDigits': ['#'],
-                'InBetweenDigitsDurationInMilliseconds': 5000,
-                'Repeat': 2,
-                'RepeatDurationInMilliseconds': 10000
-            }
+                    },
+            'MinNumberOfDigits': 11,
+            'MaxNumberOfDigits': 11,
+            'TerminatorDigits': ['#'],
+            'InBetweenDigitsDurationInMilliseconds': 5000,
+            'Repeat': 2,
+            'RepeatDurationInMilliseconds': 10000
         }
+    }
 
 
 # To read more on customizing the CallAndBridge action, see https://docs.aws.amazon.com/chime/latest/dg/call-and-bridge.html
@@ -201,61 +229,61 @@ def call_and_bridge_action(caller_id, destination):
 # To read more on customizing the VoiceFocus action, see https://docs.aws.amazon.com/chime/latest/dg/voicefocus.html
 def voicefocus_action(call_id, enabled):
     return {
-            'Type': 'VoiceFocus',
-            "Parameters": {
+        'Type': 'VoiceFocus',
+        "Parameters": {
                 'Enable': enabled,
                 'CallId': call_id,
-            }
         }
+    }
 
 
 # To read more on customizing the ReceiveDigits action, see https://docs.aws.amazon.com/chime/latest/dg/listen-to-digits.html
 def receive_digits_action(call_id):
     return {
-            'Type': 'ReceiveDigits',
-            'Parameters': {
+        'Type': 'ReceiveDigits',
+        'Parameters': {
                 'CallId': call_id,
                 'InputDigitsRegex': '[0-1]$',
                 'InBetweenDigitsDurationInMilliseconds': 1000,
                 'FlushDigitsDurationInMilliseconds': 10000
-            }
         }
+    }
 
 
 # To read more on customizing the PlayAudio action, see https://docs.aws.amazon.com/chime/latest/dg/play-audio.html
 def play_audio_action(call_id, audio_file):
     return {
-            'Type': 'PlayAudio',
-            'Parameters': {
+        'Type': 'PlayAudio',
+        'Parameters': {
                 'CallId': call_id,
                 'AudioSource': {
                     'Type': 'S3',
                     'BucketName': wav_bucket,
                     'Key': audio_file
                 }
-            }
         }
+    }
 
 
 # To read more on customizing the Pause action, see https://docs.aws.amazon.com/chime/latest/dg/pause.html
 def pause_action(call_id):
     return {
-            'Type': 'Pause',
-            'Parameters': {
+        'Type': 'Pause',
+        'Parameters': {
                 'CallId': call_id,
                 'DurationInMilliseconds': '3000'
-            }
         }
+    }
 
 
 # To read more on customizing the Hangup action, see https://docs.aws.amazon.com/chime/latest/dg/hangup.html
 def hangup_action(call_id):
-    logger.info('SEND {} {} {}'.format(log_prefix, 'Sending HANGUP action to Call-ID', call_id))
+    logger.info('SEND {} {} {}'.format(
+        log_prefix, 'Sending HANGUP action to Call-ID', call_id))
     return {
-            'Type': 'Hangup',
-            'Parameters': {
+        'Type': 'Hangup',
+        'Parameters': {
                 'CallId': call_id,
                 'SipResponseCode': '0'
-            }
         }
-
+    }
