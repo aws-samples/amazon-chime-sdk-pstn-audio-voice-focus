@@ -15,10 +15,7 @@ logger.setLevel(log_level)
 
 # Load environment variables
 wav_bucket = os.environ['WAVFILE_BUCKET']
-try:
-    dial_number = os.environ["DIAL_NUMBER"]
-except BaseException:
-    dial_number = False
+dial_number = os.environ.get('DIAL_NUMBER', False)
 
 # This is the entry point for all incoming events from Chime SipMediaApplications
 
