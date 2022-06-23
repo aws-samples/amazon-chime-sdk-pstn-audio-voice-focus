@@ -1,3 +1,3 @@
 yarn install
-yarn deploy
+yarn cdk deploy
 

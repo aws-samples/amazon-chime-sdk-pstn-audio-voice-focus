@@ -9,15 +9,17 @@ try:
     log_level = os.environ['LogLevel']
     if log_level not in ['INFO', 'DEBUG']:
         log_level = 'INFO'
-except:
+except BaseException:
     log_level = 'INFO'
 logger.setLevel(log_level)
 
 # Load environment variables
 wav_bucket = os.environ['WAVFILE_BUCKET']
-
+dial_number = os.environ.get('DIAL_NUMBER', False)
 
 # This is the entry point for all incoming events from Chime SipMediaApplications
+
+
 def lambda_handler(event, context):
 
     event_type = event['InvocationEventType']
@@ -31,7 +33,7 @@ def lambda_handler(event, context):
     logger.info('RECV {} {} {}'.format(log_prefix, event_type, 'event received'))
 
     if event_type == 'NEW_INBOUND_CALL':
-        return new_call_handler(call_id)
+        return new_call_handler(event, call_id)
 
     elif event_type == 'RINGING':
         return response()
@@ -81,9 +83,14 @@ def response(*actions):
 
 # For new incoming calls, play greeting and collect digits of destination number.
 # Regex for digits entered allows US calling, except for premium rate numbers
-def new_call_handler(call_id):
+def new_call_handler(event, call_id):
+    if dial_number:
+        logger.info("SEND {} {} {}".format(log_prefix, "Sending CallAndBridge action to Call-ID", call_id))
+        caller_id = event["CallDetails"]["Participants"][0]["To"]
+        return response(call_and_bridge_action(caller_id, dial_number))
+    else:
         logger.info('SEND {} {}'.format(log_prefix, 'Sending PlayAndGetDigits action to get Destination Number'))
-        return response(pause_action(call_id), play_and_get_digits_action(call_id, '^(?!1900)1[0-9][0-9][0-9](\d{7})$', 'welcome_vf_demo.wav', 'invalid_entry.wav'))
+        return response(pause_action(call_id), play_and_get_digits_action(call_id, '^(?!1900)1[0-9][0-9][0-9](\\d{7})$', 'welcome_vf_demo.wav', 'invalid_entry.wav'))
 
 
 # We use this function to connect the caller to the new destination number
@@ -138,6 +145,8 @@ def control_voicefocus(call_id, event):
     return response(voicefocus_action(call_id, enabled))
 
 # When we receive a hangup event, we make sure to tear down any participants still connected
+
+
 def hangup(participants):
     for call in participants:
         if call['Status'] == 'Connected':
@@ -156,8 +165,8 @@ def play_error_message(call_id):
 # To read more on customizing the PlayAudioAndGetDigits action, see https://docs.aws.amazon.com/chime/latest/dg/play-audio-get-digits.html
 def play_and_get_digits_action(call_id, regex, audio_file, failure_audio_file):
     return {
-            'Type': 'PlayAudioAndGetDigits',
-            'Parameters': {
+        'Type': 'PlayAudioAndGetDigits',
+        'Parameters': {
                 'CallId': call_id,
                 'InputDigitsRegex': regex,
                 'AudioSource': {
@@ -165,19 +174,19 @@ def play_and_get_digits_action(call_id, regex, audio_file, failure_audio_file):
                     'BucketName': wav_bucket,
                     'Key': audio_file
                 },
-                'FailureAudioSource': {
+            'FailureAudioSource': {
                     'Type': 'S3',
                     'BucketName': wav_bucket,
                     'Key': failure_audio_file
-                },
-                'MinNumberOfDigits': 11,
-                'MaxNumberOfDigits': 11,
-                'TerminatorDigits': ['#'],
-                'InBetweenDigitsDurationInMilliseconds': 5000,
-                'Repeat': 2,
-                'RepeatDurationInMilliseconds': 10000
-            }
+                    },
+            'MinNumberOfDigits': 11,
+            'MaxNumberOfDigits': 11,
+            'TerminatorDigits': ['#'],
+            'InBetweenDigitsDurationInMilliseconds': 5000,
+            'Repeat': 2,
+            'RepeatDurationInMilliseconds': 10000
         }
+    }
 
 
 # To read more on customizing the CallAndBridge action, see https://docs.aws.amazon.com/chime/latest/dg/call-and-bridge.html
@@ -201,61 +210,60 @@ def call_and_bridge_action(caller_id, destination):
 # To read more on customizing the VoiceFocus action, see https://docs.aws.amazon.com/chime/latest/dg/voicefocus.html
 def voicefocus_action(call_id, enabled):
     return {
-            'Type': 'VoiceFocus',
-            "Parameters": {
+        'Type': 'VoiceFocus',
+        "Parameters": {
                 'Enable': enabled,
                 'CallId': call_id,
-            }
         }
+    }
 
 
 # To read more on customizing the ReceiveDigits action, see https://docs.aws.amazon.com/chime/latest/dg/listen-to-digits.html
 def receive_digits_action(call_id):
     return {
-            'Type': 'ReceiveDigits',
-            'Parameters': {
+        'Type': 'ReceiveDigits',
+        'Parameters': {
                 'CallId': call_id,
-                'InputDigitsRegex': '[0-1]$',
+                'InputDigitsRegex': '[0189]$',
                 'InBetweenDigitsDurationInMilliseconds': 1000,
                 'FlushDigitsDurationInMilliseconds': 10000
-            }
         }
+    }
 
 
 # To read more on customizing the PlayAudio action, see https://docs.aws.amazon.com/chime/latest/dg/play-audio.html
 def play_audio_action(call_id, audio_file):
     return {
-            'Type': 'PlayAudio',
-            'Parameters': {
+        'Type': 'PlayAudio',
+        'Parameters': {
                 'CallId': call_id,
                 'AudioSource': {
                     'Type': 'S3',
                     'BucketName': wav_bucket,
                     'Key': audio_file
                 }
-            }
         }
+    }
 
 
 # To read more on customizing the Pause action, see https://docs.aws.amazon.com/chime/latest/dg/pause.html
 def pause_action(call_id):
     return {
-            'Type': 'Pause',
-            'Parameters': {
+        'Type': 'Pause',
+        'Parameters': {
                 'CallId': call_id,
                 'DurationInMilliseconds': '3000'
-            }
         }
+    }
 
 
 # To read more on customizing the Hangup action, see https://docs.aws.amazon.com/chime/latest/dg/hangup.html
 def hangup_action(call_id):
     logger.info('SEND {} {} {}'.format(log_prefix, 'Sending HANGUP action to Call-ID', call_id))
     return {
-            'Type': 'Hangup',
-            'Parameters': {
+        'Type': 'Hangup',
+        'Parameters': {
                 'CallId': call_id,
                 'SipResponseCode': '0'
-            }
         }
-
+    }

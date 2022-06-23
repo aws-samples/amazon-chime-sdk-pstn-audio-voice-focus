@@ -2,8 +2,6 @@
 *.d.ts
 node_modules
 out
-package-lock.json
-*.lock
 lib/*.js
 bin/*.js
 test/*.js
